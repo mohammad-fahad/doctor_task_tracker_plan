@@ -1,12 +1,12 @@
 # Screenshots
 
-Add real application screenshots here (desktop and mobile) after running the app with configured MongoDB and demo seed data.
+Browser captures from local runs of Doctor Tracker using fictional demo data. No production records or secrets are shown.
 
-Suggested filenames:
-- dashboard-desktop.png
-- doctors-desktop.png
-- doctors-detail-desktop.png
-- patients-desktop.png
-- dashboard-mobile.png
-- doctors-mobile.png
-- patients-mobile.png
+| Screen | Desktop | Mobile |
+| --- | --- | --- |
+| Dashboard | `dashboard_desktop.png` | `dashboard_mobile.png` |
+| Doctors list | `doctors_desktop.png` | `doctors_mobile.png` |
+| Doctor detail | `doctors_detail.png` | — |
+| Patients list | `patient_desktop.png` | `patient_mobile.png` |
+
+The desktop captures are approximately 1900 px wide; mobile captures are approximately 333 px wide.

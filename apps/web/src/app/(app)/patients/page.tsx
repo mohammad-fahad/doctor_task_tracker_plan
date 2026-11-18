@@ -101,6 +101,8 @@ function PatientsContent() {
   const qc = useQueryClient();
   const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
   const debouncedSearch = useDebounce(searchInput, 400);
+  const [conditionInput, setConditionInput] = useState(searchParams.get("condition") || "");
+  const debouncedCondition = useDebounce(conditionInput, 400);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Patient | null>(null);
 
@@ -133,6 +135,12 @@ function PatientsContent() {
     if (debouncedSearch !== current) updateParams({ search: debouncedSearch || undefined, page: 1 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
+
+  useEffect(() => {
+    const current = searchParams.get("condition") || "";
+    if (debouncedCondition !== current) updateParams({ condition: debouncedCondition || undefined, page: 1 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedCondition]);
 
   const listQuery = useQuery({ queryKey: ["patients", params], queryFn: () => patientApi.list(params) });
   const doctorsQuery = useQuery({ queryKey: ["doctors-for-select"], queryFn: () => doctorApi.list({ page: 1, limit: 50, sort: "newest" }) });
@@ -222,7 +230,7 @@ function PatientsContent() {
             </div>
             <div>
               <Label htmlFor="condition">Condition</Label>
-              <Input id="condition" className="mt-1" placeholder="e.g. Asthma" value={params.condition || ""} onChange={(e) => updateParams({ condition: e.target.value || undefined, page: 1 })} />
+              <Input id="condition" className="mt-1" placeholder="e.g. Asthma" value={conditionInput} onChange={(e) => setConditionInput(e.target.value)} />
             </div>
             <div>
               <Label htmlFor="from">From</Label>
