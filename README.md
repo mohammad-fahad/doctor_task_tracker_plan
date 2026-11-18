@@ -117,6 +117,7 @@ ADMIN_PASSWORD=ChangeMe123!
 **Frontend:** `apps/web/.env` (from `apps/web/.env.example`)
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://localhost:4000/api/v1
+COOKIE_NAME=dt_token
 ```
 
 ### MongoDB Setup
