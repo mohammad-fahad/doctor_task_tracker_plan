@@ -15,16 +15,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
+  verify:
+    name: Lint, typecheck, tests, builds and production audit
     runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MONGODB_URI_TEST: mongodb://127.0.0.1:27017/doctor_tracker_ci_test
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: 3d3c42e5aac5ba805825da76410c181273ba90b1 # actions/checkout@v7.0.1 (Node 24 runtime)
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: 949feb2413d6458794dcd2491c4babbbce0c15c1 # actions/setup-node@v7.1.0 (Node 24 runtime)
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -36,11 +49,19 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm run test
+      - name: Production dependency audit
+        run: npm run audit:prod
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Integration tests
+        run: npm run test:integration
 
       - name: Build API
         run: npm run build:api
 
       - name: Build web
         run: npm run build:web
+        env:
+          NEXT_PUBLIC_API_BASE_URL: https://api.example.com/api/v1
