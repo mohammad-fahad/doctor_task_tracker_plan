@@ -12,7 +12,7 @@ export function resolveApiBaseUrl(value: string | undefined, nodeEnv: string | u
   const isProduction = nodeEnv === "production";
   const trimmed = value?.trim();
   if (!trimmed) return isProduction ? undefined : DEVELOPMENT_FALLBACK;
-  return trimmed.replace(/\\/+$/, "");
+  return trimmed.replace(/\/+$/, "");
 }
 
 export function assertApiBaseUrl(
@@ -45,7 +45,7 @@ export function assertApiBaseUrl(
       throw new ApiConfigurationError("NEXT_PUBLIC_API_BASE_URL must be a same-origin path without query or hash");
     }
 
-    return relative.pathname.replace(/\\/+$/, "") || "/";
+    return relative.pathname.replace(/\/+$/, "") || "/";
   }
 
   let parsed: URL;
@@ -65,9 +65,9 @@ export function assertApiBaseUrl(
     throw new ApiConfigurationError("NEXT_PUBLIC_API_BASE_URL cannot point to localhost in production");
   }
 
-  return parsed.toString().replace(/\\/+$/, "");
+  return parsed.toString().replace(/\/+$/, "");
 }
 
 export function joinApiUrl(base: string, path: string): string {
-  return `${base.replace(/\\/+$/, "")}/${path.replace(/^\\/+/, "")}`;
+  return `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
 }
