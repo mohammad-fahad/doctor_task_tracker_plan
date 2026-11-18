@@ -1,11 +1,22 @@
 import { createHash } from "node:crypto";
 import mongoose from "mongoose";
-import { connectDb, disconnectDb } from "../config/db.js";
-import { assertRuntimeEnv, env } from "../config/env.js";
+import { disconnectDb } from "../config/db.js";
 import { Doctor } from "../models/Doctor.js";
 import { Patient } from "../models/Patient.js";
 import { ensureAdminSeed } from "../services/auth.service.js";
 import { normalizeText } from "../utils/normalize.js";
+import {
+  assertConnectedDatabase,
+  assertSeedGuards,
+  defaultSeedConfig,
+  formatSeedSummary,
+  isDirectInvocation,
+  parseSeedCliArgs,
+  seedErrorMessage,
+  withSeedDb,
+  type SeedConfig,
+  type SeedSummary,
+} from "./seed-guards.js";
 
 const doctorsSeed = [
   { name: "Dr. Amelia Hart", specialization: "Cardiology", hospital: "Harborview Medical Center", phone: "555-0101", email: "amelia.hart@example.com" },
@@ -32,10 +43,7 @@ const conditions = [
 
 const PATIENT_COUNT = 84;
 
-export type SeedOptions = {
-  reset?: boolean;
-  expectedDatabase?: string | undefined;
-};
+export type DemoSeedOptions = Partial<SeedConfig> & { includeAdmin?: boolean };
 
 function pick<T>(arr: readonly T[], i: number): T {
   return arr[i % arr.length]!;
@@ -53,46 +61,25 @@ function deterministicId(kind: "doctor" | "patient", index: number) {
   return new mongoose.Types.ObjectId(digest.subarray(0, 12));
 }
 
-export function assertSeedSafety(options: SeedOptions = {}) {
-  if (env.isProduction) {
-    throw new Error("Demo seeding is disabled in production");
-  }
-  if (options.reset && !options.expectedDatabase) {
-    throw new Error("Destructive demo reset requires expectedDatabase confirmation");
-  }
-  if (options.expectedDatabase && !/^[A-Za-z0-9_-]+$/.test(options.expectedDatabase)) {
-    throw new Error("Expected demo database name contains invalid characters");
-  }
-  if (options.expectedDatabase && /prod/i.test(options.expectedDatabase)) {
-    throw new Error("Refusing to seed a database whose name looks like production");
-  }
+export function assertSeedSafety(options: Partial<SeedConfig> = {}) {
+  assertSeedGuards({ ...defaultSeedConfig(), ...options });
 }
 
 export function assertTargetDatabase(expected?: string) {
-  const actual = mongoose.connection.db?.databaseName;
-  if (!actual) throw new Error("Demo seeding requires an active database connection");
-  if (expected && actual !== expected) {
-    throw new Error(`Refusing to seed unexpected database '${actual}' (expected '${expected}')`);
-  }
-  if (/prod/i.test(actual)) {
-    throw new Error(`Refusing to seed database '${actual}' because its name looks like production`);
-  }
+  assertConnectedDatabase(expected);
 }
 
-export async function runDemoSeed(options: SeedOptions = {}) {
-  assertSeedSafety(options);
-  assertRuntimeEnv();
-  await connectDb();
-  assertTargetDatabase(options.expectedDatabase ?? process.env.DEMO_SEED_DATABASE);
-
-  const admin = await ensureAdminSeed();
-  if (!admin) throw new Error("Admin seeding did not complete");
-
+export async function seedDemoData(config: SeedConfig) {
   const doctorIds = doctorsSeed.map((_, i) => deterministicId("doctor", i));
   const patientIds = Array.from({ length: PATIENT_COUNT }, (_, i) => deterministicId("patient", i));
 
-  if (options.reset) {
-    if (!options.expectedDatabase) throw new Error("Destructive demo reset requires expectedDatabase confirmation");
+  if (config.removeDemo) {
+    await Patient.deleteMany({ _id: { $in: patientIds } });
+    await Doctor.deleteMany({ _id: { $in: doctorIds } });
+    return { doctors: doctorIds.length, patients: patientIds.length, removed: true };
+  }
+
+  if (config.reset) {
     await Patient.deleteMany({ _id: { $in: patientIds } });
     await Doctor.deleteMany({ _id: { $in: doctorIds } });
   }
@@ -152,24 +139,39 @@ export async function runDemoSeed(options: SeedOptions = {}) {
     }))
   );
 
-  return { doctors: doctorIds.length, patients: patientIds.length };
+  return { doctors: doctorIds.length, patients: patientIds.length, removed: false };
 }
 
-async function main() {
-  const reset = process.argv.includes("--reset");
-  const expectedDatabase = process.argv.find((a) => a.startsWith("--database="))?.slice("--database=".length);
-  const result = await runDemoSeed({ reset, expectedDatabase });
-  console.log(`Seeded ${result.doctors} demo doctors and ${result.patients} demo patients.`);
+export async function runDemoSeed(options: DemoSeedOptions = {}) {
+  const config: SeedConfig = { ...defaultSeedConfig(), ...options, scope: "demo" };
+  return withSeedDb(config, async () => {
+    if (options.includeAdmin !== false) {
+      const admin = await ensureAdminSeed();
+      if (!admin) throw new Error("Admin seeding did not complete");
+    }
+    return seedDemoData(config);
+  });
 }
 
-const invokedPath = process.argv[1] ?? "";
-if (invokedPath.endsWith("seed-demo.ts") || invokedPath.endsWith("seed-demo.js")) {
-  main()
-    .catch((err: unknown) => {
-      console.error(err instanceof Error ? err.message : err);
-      process.exitCode = 1;
-    })
-    .finally(async () => {
-      await disconnectDb().catch(() => {});
-    });
+async function main(): Promise<SeedSummary> {
+  const config = parseSeedCliArgs(process.argv.slice(2));
+  const demo = await runDemoSeed(config);
+  return { demo: { ...demo, reset: config.reset } };
+}
+
+if (isDirectInvocation(import.meta.url)) {
+  const args = process.argv.slice(2);
+  if (args.includes("--help")) {
+    console.log("Usage: npm run seed:demo -- [options] (see npm run seed:uat -- --help)");
+  } else {
+    main()
+      .then((summary) => console.log(formatSeedSummary(summary)))
+      .catch((err: unknown) => {
+        console.error(seedErrorMessage(err));
+        process.exitCode = 1;
+      })
+      .finally(async () => {
+        await disconnectDb().catch(() => {});
+      });
+  }
 }

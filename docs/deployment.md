@@ -32,8 +32,8 @@ Set these on both Production and Preview, with environment-specific values:
 - `COOKIE_SAME_SITE=none`
 - `COOKIE_DOMAIN` (empty unless using a shared parent domain)
 - `CORS_ORIGINS` (exact origins, comma-separated, no trailing slash)
-- `ADMIN_EMAIL`, `ADMIN_PASSWORD` (bootstrap context only; rotate after use)
-- `DEMO_SEED_DATABASE` (optional, local/preview demo seeding only)
+- `ADMIN_EMAIL`, `ADMIN_PASSWORD` (trusted local bootstrap shell only; never in Vercel environment variables)
+- `UAT_SEED_ALLOW_PRODUCTION`, `UAT_SEED_DATABASE`, `UAT_SEED_RESET_PASSWORD`, `UAT_SEED_RESET_DEMO` (owner-only local seed opt-ins; never in Vercel or application runtime environments; see README)
 
 ### Web
 

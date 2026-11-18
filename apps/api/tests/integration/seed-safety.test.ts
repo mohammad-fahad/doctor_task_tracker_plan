@@ -55,7 +55,7 @@ describeWithDb("demo seed data safety", () => {
 
   it("rejects a mismatched database target before any destructive operation", async () => {
     await expect(runDemoSeed({ reset: true, expectedDatabase: "some-other-demo-db" })).rejects.toThrow(
-      /unexpected database/
+      /does not match confirmed database/
     );
   });
 });
