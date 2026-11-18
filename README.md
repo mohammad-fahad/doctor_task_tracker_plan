@@ -118,8 +118,14 @@ ADMIN_PASSWORD=replace-with-a-strong-unique-password
 **Frontend:** `apps/web/.env` (from `apps/web/.env.example`)
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://localhost:4000/api/v1
+API_UPSTREAM_ORIGIN=http://localhost:4000
 COOKIE_NAME=dt_token
 ```
+For Vercel deployments, set `NEXT_PUBLIC_API_BASE_URL=/api/v1` and the server-only
+`API_UPSTREAM_ORIGIN` to the API's HTTPS origin (for example, `https://api.example.vercel.app`).
+Next.js proxies `/api/v1/*` through the web origin so the browser's HTTP-only session cookie
+belongs to the web host and is visible to the web route proxy. Set this variable for each
+Vercel environment that should serve the app.
 
 ### MongoDB Setup
 - Local: ensure MongoDB is running and `MONGODB_URI` points to it.
@@ -254,7 +260,7 @@ flowchart LR
   end
 ```
 
-The web app inlines `NEXT_PUBLIC_API_BASE_URL` at build time and validates it when an API request is made, so a missing/invalid production value raises a clear `ApiConfigurationError` without blocking Vercel preview builds. The serverless API validates its runtime environment at cold start and waits for one shared MongoDB connection before serving non-liveness requests; failed initialization is retried on the next invocation.
+The web app inlines `NEXT_PUBLIC_API_BASE_URL` at build time and validates it when an API request is made. In Vercel, use the same-origin path `/api/v1` and set the server-only `API_UPSTREAM_ORIGIN` to the API HTTPS origin; the Next.js rewrite proxies API traffic without exposing a cross-site cookie to the browser. This keeps the HTTP-only auth cookie on the web host, where the frontend route proxy can verify it. Local development may continue to call `http://localhost:4000/api/v1` directly. The serverless API validates its runtime environment at cold start and waits for one shared MongoDB connection before serving non-liveness requests; failed initialization is retried on the next invocation.
 
 **Data flow:** UI actions -> validated client forms -> API client (`fetch` with cookies) -> Express middleware/validation -> service layer -> Mongoose/MongoDB -> normalized JSON responses -> TanStack Query cache/invalidation.
 
