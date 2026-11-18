@@ -184,7 +184,7 @@ describeWithDb("API integration: auth, CRUD, pagination and search", () => {
       specializationNormalized: "general",
       hospitalNormalized: "test hospital",
     });
-    for (let i = 0; i < 3; i += 1) {
+    for (let i = 0; i < 12; i += 1) {
       await Patient.create({
         name: `Search Subject ${i}`,
         doctorId: doctor._id,
@@ -198,11 +198,11 @@ describeWithDb("API integration: auth, CRUD, pagination and search", () => {
       });
     }
     const page = await request(app)
-      .get("/api/v1/patients?search=subject&limit=2&page=2")
+      .get("/api/v1/patients?search=subject&limit=10&page=2")
       .set("Cookie", cookie)
       .expect(200);
-    expect(page.body.data).toHaveLength(1);
-    expect(page.body.pagination.total).toBe(3);
+    expect(page.body.data).toHaveLength(2);
+    expect(page.body.pagination.total).toBe(12);
     expect(page.body.pagination.page).toBe(2);
   });
 });
