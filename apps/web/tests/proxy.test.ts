@@ -27,15 +27,10 @@ describe("web proxy", () => {
     else process.env.COOKIE_NAME = originalCookieName;
   });
 
-  it("redirects unauthenticated protected routes to login with the return path and query", () => {
-    const url = redirectPath("/patients?page=2&search=lee");
-    expect(url?.pathname).toBe("/login");
-    expect(url?.searchParams.get("next")).toBe("/patients?page=2&search=lee");
-  });
-
-  it("redirects nested protected routes and allows authenticated access", () => {
-    expect(redirectPath("/doctors/507f1f77bcf86cd799439011")?.pathname).toBe("/login");
-    expect(redirectPath("/doctors/507f1f77bcf86cd799439011", { dt_token: "jwt" })).toBeNull();
+  it("leaves protected routes to the client-side session check", () => {
+    expect(redirectPath("/dashboard")).toBeNull();
+    expect(redirectPath("/patients?page=2&search=lee")).toBeNull();
+    expect(redirectPath("/doctors/507f1f77bcf86cd799439011")).toBeNull();
   });
 
   it("redirects authenticated users away from login", () => {
@@ -44,8 +39,8 @@ describe("web proxy", () => {
 
   it("honors a custom cookie name and still accepts the legacy name", () => {
     process.env.COOKIE_NAME = "custom_session";
-    expect(redirectPath("/dashboard", { custom_session: "jwt" })).toBeNull();
-    expect(redirectPath("/dashboard", { dt_token: "jwt" })).toBeNull();
+    expect(redirectPath("/login", { custom_session: "jwt" })?.pathname).toBe("/dashboard");
+    expect(redirectPath("/login", { dt_token: "jwt" })?.pathname).toBe("/dashboard");
   });
 
   it("does not redirect public routes or 404 paths", () => {
@@ -54,6 +49,6 @@ describe("web proxy", () => {
   });
 
   it("uses the expected matcher", () => {
-    expect(config.matcher).toEqual(["/login", "/dashboard/:path*", "/doctors/:path*", "/patients/:path*"]);
+    expect(config.matcher).toEqual(["/login"]);
   });
 });
