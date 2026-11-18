@@ -24,13 +24,13 @@
 
 **Alternatives rejected:** generate random IDs each run (not idempotent), reset whole collections (unsafe), allow reset based only on the current URI (too easy to point at the wrong DB), and add doctor users/roles to satisfy a seed requirement (not a real application feature).
 
-## Web proxy migration
+## Web proxy migration and session gate
 
-**Decision:** Rename `middleware.ts` to `proxy.ts` and export `proxy()` for Next.js 16.
+**Decision:** Use the Next.js 16 `proxy.ts` convention only to redirect an already cookie-bearing visitor away from `/login`. Authorization is enforced by the protected layout calling `GET /api/v1/auth/me`, with the API verifying the JWT cookie and user on every protected request; unauthenticated users are redirected to `/login?next=...`.
 
-**Why:** Next.js 16 deprecates the `middleware` convention. The migration preserves matcher behavior, cookie lookup, protected-route redirects with `next` query preservation, and login redirects.
+**Why:** Next.js 16 deprecates the `middleware` convention, and the cross-origin login fix showed that inspecting a proxy-visible cookie is not a valid authorization gate when the API is on another domain. API-side session verification is the authoritative check, while the proxy remains a small UX optimization on the login route.
 
-**Alternatives rejected:** remain on deprecated middleware (future upgrade debt) and move all protection to client components (insecure on direct navigation).
+**Alternatives rejected:** treating cookie presence in the proxy as proof of authentication, and relying on client-only UI hiding without API-side protection.
 
 ## API base URL configuration
 

@@ -46,7 +46,8 @@ Set these on both Production and Preview, with environment-specific values:
 
 - Web and API on different Vercel domains require `SameSite=None; Secure` cookies over HTTPS.
 - `CORS_ORIGINS` must contain the exact web origin(s), and credentialed CORS must remain enabled.
-- The web proxy reads `COOKIE_NAME` server-side; the API uses the same value for cookie set/clear.
+- The API sets and clears the cookie named by `COOKIE_NAME` and verifies it on every protected request. The web proxy reads the same name only to redirect an already cookie-bearing visitor away from `/login`; it is not the authorization gate.
+- Protected pages call `GET /api/v1/auth/me`; a 401 redirects the browser to `/login?next=...`. Verify this after a cross-origin login and after a hard refresh.
 - Do not set `COOKIE_DOMAIN` for unrelated `*.vercel.app` domains.
 
 ## Preview verification
