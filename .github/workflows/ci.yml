@@ -30,8 +30,7 @@ jobs:
         run: npm run typecheck
 
       - name: ESLint (web)
-        run: npx --no-install eslint . --max-warnings=0
-        working-directory: apps/web
+        run: npx --no-install eslint apps/web --config apps/web/eslint.config.mjs --max-warnings=0
 
       - name: Unit tests
         run: npm run test
