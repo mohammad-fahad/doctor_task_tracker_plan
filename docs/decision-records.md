@@ -18,11 +18,11 @@
 
 ## Demo seed safety
 
-**Decision:** Deterministic IDs, target-database assertion, production fail-closed, explicit `--reset --database=<name>`, admin bootstrap error propagation, and deletion limited to seeder-owned IDs.
+**Decision:** One-command local `npm run seed:uat` with deterministic IDs, idempotent upserts, exact connected-database verification, explicit `--reset`/`--remove-demo` with `--database`, explicit `--reset-password --confirm-reset-password`, separate production env/CLI opt-ins, and deletion limited to seeder-owned IDs.
 
-**Why:** A demo utility must be idempotent and incapable of wiping unrelated or production data. Earlier code swallowed admin-seed errors and reset broad collections.
+**Why:** A demo utility must be idempotent and incapable of wiping unrelated or production data. Earlier code swallowed admin-seed errors, reset broad collections, and blocked all production seeding. The current design keeps production fail-closed by default while allowing an owner to opt in deliberately from a trusted local terminal.
 
-**Alternatives rejected:** generate random IDs each run (not idempotent), reset whole collections (unsafe), and allow reset based only on the current URI (too easy to point at the wrong DB).
+**Alternatives rejected:** generate random IDs each run (not idempotent), reset whole collections (unsafe), allow reset based only on the current URI (too easy to point at the wrong DB), and add doctor users/roles to satisfy a seed requirement (not a real application feature).
 
 ## Web proxy migration
 
