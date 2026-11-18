@@ -29,7 +29,7 @@ const patientSchema = z.object({
   name: z.string().trim().min(2, "Name is required"),
   doctorId: z.string().min(1, "Doctor is required"),
   age: z.coerce.number().int().min(0, "Age must be valid").max(130, "Age must be valid"),
-  gender: z.enum(["male", "female", "other"], { required_error: "Gender is required" }),
+  gender: z.enum(["male", "female", "other"], { error: "Gender is required" }),
   condition: z.string().trim().min(2, "Condition is required"),
   phone: z.string().trim().min(7, "Enter a valid phone number"),
   email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")),

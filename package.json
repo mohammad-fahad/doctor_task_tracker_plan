@@ -14,6 +14,9 @@
     "lint": "npm run lint -w apps/api && npm run lint -w apps/web",
     "typecheck": "npm run typecheck -w apps/api && npm run typecheck -w apps/web",
     "test": "npm run test -w apps/api",
+    "test:unit": "npm run test:unit -w apps/api",
+    "test:integration": "npm run test:integration -w apps/api",
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
     "seed:admin": "npm run seed:admin -w apps/api",
     "seed:demo": "npm run seed:demo -w apps/api"
   },
