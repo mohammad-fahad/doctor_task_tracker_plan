@@ -17,15 +17,24 @@ export async function authenticateAdmin(email: string, password: string) {
   return { token, user: { id: String(user._id), email: user.email, role: user.role } };
 }
 
-export async function ensureAdminSeed(email?: string, password?: string) {
+export async function ensureAdminSeed(
+  email?: string,
+  password?: string,
+  options: { resetPassword?: boolean } = {}
+) {
   const adminEmail = (email || env.ADMIN_EMAIL || "").toLowerCase();
   const adminPassword = password || env.ADMIN_PASSWORD;
   if (!adminEmail || !adminPassword) {
     throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD must be provided for admin seeding");
   }
   const existing = await User.findOne({ email: adminEmail }).exec();
-  if (existing) return { created: false, email: adminEmail };
+  if (existing) {
+    if (!options.resetPassword) return { created: false, passwordReset: false, email: adminEmail };
+    existing.passwordHash = await bcrypt.hash(adminPassword, 12);
+    await existing.save();
+    return { created: false, passwordReset: true, email: adminEmail };
+  }
   const passwordHash = await bcrypt.hash(adminPassword, 12);
   await User.create({ email: adminEmail, passwordHash, role: "admin" as const });
-  return { created: true, email: adminEmail };
+  return { created: true, passwordReset: false, email: adminEmail };
 }

@@ -13,6 +13,7 @@
     "test:unit": "vitest run --config vitest.config.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
+    "seed:uat": "tsx src/scripts/seed-uat.ts",
     "seed:admin": "tsx src/scripts/seed-admin.ts",
     "seed:demo": "tsx src/scripts/seed-demo.ts"
   },
