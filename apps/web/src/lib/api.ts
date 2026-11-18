@@ -1,4 +1,6 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api/v1";
+import { joinApiUrl, resolveApiBaseUrl } from "./api-config";
+
+const API_BASE = resolveApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL, process.env.NODE_ENV);
 
 export class ApiClientError extends Error {
   status: number;
@@ -14,7 +16,7 @@ type ApiOptions = RequestInit & { json?: unknown };
 
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const { json, headers, ...rest } = options;
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(joinApiUrl(API_BASE, path), {
     credentials: "include",
     headers: {
       ...(json ? { "Content-Type": "application/json" } : {}),

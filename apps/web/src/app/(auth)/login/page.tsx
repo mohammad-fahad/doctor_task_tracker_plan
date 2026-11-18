@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { authApi } from "@/lib/api-client";
 import { ApiClientError } from "@/lib/api";
+import { safeNextPath } from "@/lib/redirect";
 
 const schema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -31,8 +32,7 @@ function LoginForm() {
     try {
       await authApi.login(values);
       toast.success("Signed in successfully");
-      const next = searchParams.get("next") || "/dashboard";
-      router.push(next);
+      router.push(safeNextPath(searchParams.get("next")));
       router.refresh();
     } catch (err) {
       const msg = err instanceof ApiClientError ? err.message : "Unable to sign in";
