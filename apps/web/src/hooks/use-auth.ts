@@ -5,9 +5,11 @@ import { authApi } from "@/lib/api-client";
 import { ApiClientError } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
+export const meQueryKey = ["me"] as const;
+
 export function useMe() {
   return useQuery({
-    queryKey: ["me"],
+    queryKey: meQueryKey,
     queryFn: async () => {
       const res = await authApi.me();
       return res.data.user;
@@ -21,8 +23,8 @@ export function useLogin() {
   const router = useRouter();
   return useMutation({
     mutationFn: authApi.login,
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["me"] });
+    onSuccess: () => {
+      qc.removeQueries({ queryKey: meQueryKey });
       router.push("/dashboard");
     },
   });

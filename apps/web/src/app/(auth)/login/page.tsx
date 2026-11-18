@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { authApi } from "@/lib/api-client";
 import { ApiClientError } from "@/lib/api";
 import { safeNextPath } from "@/lib/redirect";
+import { meQueryKey } from "@/hooks/use-auth";
 
 const schema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -24,6 +26,7 @@ type FormValues = z.infer<typeof schema>;
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
@@ -31,9 +34,9 @@ function LoginForm() {
     setSubmitting(true);
     try {
       await authApi.login(values);
+      queryClient.removeQueries({ queryKey: meQueryKey });
       toast.success("Signed in successfully");
       router.push(safeNextPath(searchParams.get("next")));
-      router.refresh();
     } catch (err) {
       const msg = err instanceof ApiClientError ? err.message : "Unable to sign in";
       toast.error(msg);
