@@ -1,0 +1,156 @@
+"use client";
+
+import { Suspense, useMemo, useState } from "react";
+import Link from "next/link";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { AppShell } from "@/components/layout/app-shell";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { doctorApi, patientApi } from "@/lib/api-client";
+import { EmptyState, ErrorState } from "@/components/shared/states";
+import { PaginationControls } from "@/components/shared/pagination-controls";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatDate } from "@/lib/utils";
+
+const patientSchema = z.object({
+  name: z.string().trim().min(2, "Name is required"),
+  age: z.coerce.number().int().min(0).max(130),
+  gender: z.enum(["male", "female", "other"], { required_error: "Gender is required" }),
+  condition: z.string().trim().min(2, "Condition is required"),
+  phone: z.string().trim().min(7, "Enter a valid phone number"),
+  email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")),
+});
+type PatientFormValues = z.infer<typeof patientSchema>;
+
+function DoctorDetailContent() {
+  const params = useParams<{ id: string }>();
+  const id = params.id;
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+
+  const q = useMemo(() => {
+    const page = Number(searchParams.get("page") || "1");
+    const limit = Number(searchParams.get("limit") || "10");
+    return {
+      page: Number.isFinite(page) && page > 0 ? page : 1,
+      limit: [10, 20, 50].includes(limit) ? limit : 10,
+    };
+  }, [searchParams]);
+
+  function updateParams(updates: Record<string, string | number | undefined>) {
+    const sp = new URLSearchParams(searchParams.toString());
+    Object.entries(updates).forEach(([k, v]) => { if (v === undefined || v === "") sp.delete(k); else sp.set(k, String(v)); });
+    router.replace(`${pathname}?${sp.toString()}`);
+  }
+
+  const doctorQuery = useQuery({ queryKey: ["doctor", id], queryFn: async () => (await doctorApi.get(id)).data });
+  const patientsQuery = useQuery({ queryKey: ["doctor-patients", id, q], queryFn: () => doctorApi.patients(id, q) });
+
+  const form = useForm<PatientFormValues>({
+    resolver: zodResolver(patientSchema),
+    defaultValues: { name: "", age: 0, gender: "male", condition: "", phone: "", email: "" },
+  });
+
+  const addPatient = useMutation({
+    mutationFn: (values: PatientFormValues) => doctorApi.addPatient(id, { ...values, email: values.email || undefined }),
+    onSuccess: async () => {
+      toast.success("Patient added");
+      setOpen(false);
+      form.reset({ name: "", age: 0, gender: "male", condition: "", phone: "", email: "" });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["doctor-patients", id] }),
+        qc.invalidateQueries({ queryKey: ["patients"] }),
+        qc.invalidateQueries({ queryKey: ["dashboard-summary"] }),
+        qc.invalidateQueries({ queryKey: ["doctor", id] }),
+      ]);
+    },
+    onError: (e: any) => toast.error(e?.message || "Failed to add patient"),
+  });
+
+  const deletePatient = useMutation({
+    mutationFn: (patientId: string) => patientApi.remove(patientId),
+    onSuccess: async () => {
+      toast.success("Patient deleted");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["doctor-patients", id] }),
+        qc.invalidateQueries({ queryKey: ["patients"] }),
+        qc.invalidateQueries({ queryKey: ["dashboard-summary"] }),
+        qc.invalidateQueries({ queryKey: ["doctor", id] }),
+      ]);
+    },
+    onError: (e: any) => toast.error(e?.message || "Failed to delete patient"),
+  });
+
+  const doctor = doctorQuery.data as any;
+  const patients = patientsQuery.data?.data || [];
+  const pagination = patientsQuery.data?.pagination;
+
+  return (
+    <AppShell
+      title={doctor?.name || "Doctor details"}
+      actions={
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild><Link href="/doctors"><ArrowLeft className="mr-2 h-4 w-4" />Back</Link></Button>
+          <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) form.reset({ name: "", age: 0, gender: "male", condition: "", phone: "", email: "" }); }}>
+            <DialogTrigger asChild><Button size="sm"><Plus className="mr-2 h-4 w-4" />Add patient</Button></DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Add patient</DialogTitle>
+                <DialogDescription>Assign a new patient to this doctor.</DialogDescription>
+              </DialogHeader>
+              <form className="grid gap-4 sm:grid-cols-2" onSubmit={form.handleSubmit((v) => addPatient.mutate(v))}>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Name</Label>
+                  <Input {...form.register("name")} />
+                  {form.formState.errors.name && <p className="text-sm text-red-600">{form.formState.errors.name.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label>Age</Label>
+                  <Input type="number" {...form.register("age")} />
+                  {form.formState.errors.age && <p className="text-sm text-red-600">{form.formState.errors.age.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label>Gender</Label>
+                  <Select value={form.watch("gender")} onValueChange={(v) => form.setValue("gender", v as any, { shouldValidate: true })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {form.formState.errors.gender && <p className="text-sm text-red-600">{form.formState.errors.gender.message}</p>}
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Condition</Label>
+                  <Input {...form.register("condition")} />
+                  {form.formState.errors.condition && <p className="text-sm text-red-600">{form.formState.errors.condition.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label>Phone</Label>
+                  <Input {...form.register("phone")} />
+                  {form.formState.errors.phone && <p className="text-sm text-red-600">{form.formState.errors.phone.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label>Email (optional)</Label>
+                  <Input type="email" {...form.register("email")} />
+                  {form.formState.errors.email && <p className="text-sm text-red-600">{form.formState.errors.email.message}</p>}
+                </div>
+                <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+    
