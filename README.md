@@ -86,9 +86,9 @@ doctor-tracker/
 ## Local Setup Guide
 
 ### Prerequisites
-- Node.js LTS (tested with Node 22.x)
+- Node.js 24 (CI uses Node 24; local verification also passed on Node 22)
 - npm 10+
-- MongoDB (local instance or MongoDB Atlas connection string)
+- MongoDB (local instance or isolated test/development database). Never use a production database for tests or demo seeding.
 
 ### Installation
 ```bash
@@ -131,11 +131,15 @@ npm run seed:admin
 ```
 
 ### Demo Seed (idempotent demo dataset)
-Resets demo collections and seeds 12 fictional doctors and 84 fictional patients with varied dates/specializations/conditions. Also ensures admin exists.
+Seeds 12 fictional doctors and 84 fictional patients with varied dates/specializations/conditions. Existing non-demo records are never modified. Also ensures the configured admin exists.
 ```bash
 npm run seed:demo
 ```
-> All seeded data is fictitious and uses `@example.com`/non-real contact details.
+Optional reset removes only deterministic demo IDs:
+```bash
+npm run seed:demo -- --reset --database=<exact-database-name>
+```
+> Production is fail-closed: seeding is rejected when `NODE_ENV=production`, an unexpected target database is connected, or `--reset` is used without an explicit database name. All seeded data is fictitious and uses `@example.com`/non-real contact details.
 
 ### Development Commands
 ```bash
@@ -167,8 +171,12 @@ flowchart LR
     MW --> C[Controllers]
     C --> S[Services]
     S --> MD[Models + Indexes]
+    A --> H[/health: liveness]
+    A --> R[/ready: database ping]
   end
 ```
+
+The web app resolves the API base URL at build time (`NEXT_PUBLIC_API_BASE_URL`) and fails fast in production when it is missing or invalid. The serverless API validates its runtime environment at cold start and waits for one shared MongoDB connection before serving non-liveness requests; failed initialization is retried on the next invocation.
 
 **Data flow:** UI actions -> validated client forms -> API client (`fetch` with cookies) -> Express middleware/validation -> service layer -> Mongoose/MongoDB -> normalized JSON responses -> TanStack Query cache/invalidation.
 
@@ -188,6 +196,14 @@ Search uses normalized lowercase fields and escaped regex with anchored/prefix-f
 
 ### B. MongoDB Aggregation for Dashboard Analytics
 Dashboard metrics are computed in MongoDB via aggregation pipelines (`$match`, `$group`, `$dateToString`, `$lookup`, `$project`, `$sort`, `$limit`) instead of fetching patient records into the frontend/backend memory. This minimizes data transfer, scales with collection size, and keeps grouping/counting close to the data. The API returns only required chart/summary payloads and distinguishes all-time totals from date-filtered period metrics. Empty datasets are handled with zeroed/empty responses for clean UI states.
+
+### C. Typed Validation Boundary and Safe Serverless Startup
+Validated request data is stored in `res.locals.validated` by source (`body`, `query`, `params`), so controllers consume inferred Zod types without mutating Express request objects or using `any`. Next.js 16's `proxy` replaces deprecated middleware while preserving cookie-based route protection and redirect query preservation. The Vercel handler validates env at cold start, shares one DB connection promise, bypasses DB waits for `/health`, and exposes `/ready` with an actual `ping`.
+
+### D. Search Semantics and Demo Seed Safety
+Search regexes use escaped input with case-insensitive substring matching; this preserves existing behavior while preventing regex injection. Demo seeding uses deterministic IDs and validates the exact target database. Production seeding and unconfirmed resets are rejected, admin bootstrap failures are propagated, and reset only removes IDs owned by the seeder.
+
+See [decision records](docs/decision-records.md) for the rationale and alternatives considered.
 
 ## API Documentation
 
@@ -224,7 +240,8 @@ Base URL: `/api/v1` (JSON responses: `{ success, data, ... }` or `{ success: fal
 ### Analytics & Health
 - `GET /api/v1/dashboard/summary?from=&to=` (auth required)
   - Returns `{ totals, period, patientsPerDoctor, registrationsOverTime }`
-- `GET /api/v1/health` – service status/timestamp
+- `GET /api/v1/health` – liveness/status (does not wait for MongoDB)
+- `GET /api/v1/ready` – readiness; `200` with `{ status: "ready", database: "connected" }` after a successful `ping`, otherwise `503`
 
 **Pagination response shape:**
 ```json
@@ -244,6 +261,9 @@ Base URL: `/api/v1` (JSON responses: `{ success, data, ... }` or `{ success: fal
 - Helmet security headers and login rate limiting
 - Zod validation, ObjectId validation, centralized error handling (no stack traces in production)
 - Frontend and API route protection with 401 handling
+- Production-only dependency audit gate (`npm run audit:prod`) with documented dev-tooling exceptions in [security audit triage](docs/security-audit.md)
+- Seed script is production fail-closed and DB-name scoped; reset cannot remove non-demo data
+- CI uses least-privilege `contents: read` permissions, pinned action SHAs, and never receives production secrets
 
 ## Performance Considerations
 - Server-side pagination/search/filter/sort across list endpoints
@@ -256,55 +276,73 @@ Base URL: `/api/v1` (JSON responses: `{ success, data, ... }` or `{ success: fal
 
 ## Testing Instructions
 
-Backend tests (Vitest, no external DB required for included tests):
+Full local verification (Node 24, npm 10+):
 ```bash
-npm run test -w apps/api
-# or
-npm run test
-```
-Included coverage:
-- Login/doctor/patient validation (including invalid doctor reference format)
-- Search/filter query builder logic
-- Pagination boundary/default behavior
-- Date-range parsing used by dashboard/services
-
-Type checks / lint / builds:
-```bash
-npm run typecheck
+npm ci
 npm run lint
-npm run build
+npm run typecheck
+npm run audit:prod
+npm run test:unit
+npm run test:integration
+npm run build:api
+NEXT_PUBLIC_API_BASE_URL=https://api.example.com/api/v1 npm run build:web
 ```
-> If MongoDB-backed integration tests are added, provide a dedicated test database URI; builds and included unit tests do not require production credentials.
+
+`npm run test:unit` runs API unit tests plus web tests (no database required). Coverage includes validation schemas, query builders, dashboard aggregation mapping, real Express routes with mocked services, seed safety, serverless lifecycle/retry/concurrency, API config resolution, and proxy redirects.
+
+`npm run test:integration` runs DB-backed API tests only when `MONGODB_URI_TEST` points to a reachable isolated MongoDB. Without it, the suite skips cleanly. CI provides a `mongo:7` service and sets `MONGODB_URI_TEST`, so integration coverage runs on every PR. The tests drop only their dedicated test database in `afterAll`; never point this variable at production.
+
+> `next build` intentionally fails when `NEXT_PUBLIC_API_BASE_URL` is missing in production mode. Set it to the real API URL on Vercel and to any syntactically valid placeholder for local/CI build verification.
 
 ## Deployment Readiness (Vercel + MongoDB Atlas)
 
 ### Targets
-- **Frontend:** Vercel (`apps/web`)
-- **Backend:** Vercel Functions (`apps/api`, entry `api/index.ts`, `vercel.json`)
-- **Database:** MongoDB Atlas
+- **Frontend:** Vercel project `web`, root `apps/web`, framework Next.js 16.
+- **Backend:** Vercel project `api`, root `apps/api`, Node function entry `api/index.ts` via `vercel.json`.
+- **Database:** MongoDB Atlas, one cluster with dedicated database/user per environment where possible.
+- **Observability:** liveness `GET /api/v1/health`, readiness `GET /api/v1/ready`.
 
-### Production Environment Variables
-**Backend (`apps/api`)**
-- `NODE_ENV=production`
-- `MONGODB_URI` (Atlas)
-- `JWT_SECRET` (strong secret, >=16 chars)
-- `JWT_EXPIRES_IN` (e.g. `7d`)
-- `COOKIE_NAME` (e.g. `dt_token`)
+### Environment Variables by Scope
+**API (Vercel project `api`, Production + Preview)**
+- `NODE_ENV=production` (set by Vercel for production deployments)
+- `MONGODB_URI` — Atlas connection string for the target environment
+- `JWT_SECRET` — strong secret (>=16 chars), unique per environment
+- `JWT_EXPIRES_IN=7d`
+- `COOKIE_NAME=dt_token` — must match the web proxy's `COOKIE_NAME`
 - `COOKIE_SECURE=true`
-- `COOKIE_SAME_SITE=none` (for cross-site frontend/backend domains; requires HTTPS)
-- `COOKIE_DOMAIN` (set only if needed for shared parent domain)
-- `CORS_ORIGINS=https://<your-web-domain>`
-- `ADMIN_EMAIL`, `ADMIN_PASSWORD` (for bootstrap command execution context)
+- `COOKIE_SAME_SITE=none` — required for cross-site `*.vercel.app` or separate domains
+- `COOKIE_DOMAIN` — only for a shared parent domain; leave empty for independent Vercel domains
+- `CORS_ORIGINS` — exact comma-separated frontend origin(s), no trailing slash
+- `ADMIN_EMAIL`, `ADMIN_PASSWORD` — only in bootstrap execution context; rotate after bootstrap
+- `DEMO_SEED_DATABASE` — optional exact database guard for local/preview demo seeding only
 
-**Frontend (`apps/web`)**
-- `NEXT_PUBLIC_API_BASE_URL=https://<your-api-domain>/api/v1`
+**Web (Vercel project `web`, Production + Preview)**
+- `NEXT_PUBLIC_API_BASE_URL=https://<api-domain>/api/v1` — required; a missing/invalid value fails the build
+- `COOKIE_NAME=dt_token` — server-side proxy only, must match API
 
-### Notes
-- Configure CORS origin to exact frontend URL(s) and keep credentials enabled.
-- For separate Vercel domains, use `SameSite=None; Secure` cookies over HTTPS.
-- Health check: `GET /api/v1/health`
-- Build/start commands: root/app scripts (`npm run build`, `npm run dev` locally); Vercel uses project builds (`next build`, serverless function bundling for API).
-- `.env` files and secrets must never be committed. Demo credentials should be shared privately.
+> `NEXT_PUBLIC_*` values are inlined at build time. Changing them requires a redeploy. Preview deployments must point at the preview API and include that preview web origin in the API's `CORS_ORIGINS`.
+
+### Pre-deploy / Promotion Checklist
+1. Confirm the PR CI run is green: lint, typecheck, production audit, unit tests, DB-backed integration tests, API build, web build.
+2. Confirm Vercel bot comments show a successful preview deployment for both projects and manually smoke-test login, protected routes, create/edit/delete, and dashboard on the preview URL.
+3. Verify `CORS_ORIGINS`, cookie domain/SameSite/Secure, and `NEXT_PUBLIC_API_BASE_URL` match the exact target origins.
+4. Confirm branch protection requires the CI check and review before merging (currently an owner action; see below).
+5. Merge the PR; Vercel promotes the same commit to Production. Confirm production commit statuses and smoke-test `/health`, `/ready`, login, and one read/write flow.
+6. Rollback by redeploying the previous known-good Vercel deployment (or reverting the merge commit and allowing CI/Vercel to redeploy). Do not mutate production data during rollback.
+
+### Current Repository Evidence and Limits
+- Main baseline `9d4861259239f61232b84035fe1183740a613c78` had a successful CI run and successful Vercel commit statuses for both projects.
+- Vercel bot preview evidence for PR #1 exists for `api` and `web`; detailed dashboard-only production settings are dynamic and must be verified by an owner with dashboard access.
+- Branch protection on `main` currently returns `404 Branch not protected`. CI is configured but not enforced until an owner enables it. This is reported as an owner action, not silently assumed.
+- No production secrets were inspected, installed, or logged. The Vercel CLI was not used.
+
+See [deployment guide](docs/deployment.md) and [CI/CD notes](docs/ci-cd.md) for details.
+
+## Additional Documentation
+- [Deployment guide](docs/deployment.md) — Vercel setup, env scoping, preview smoke tests, promotion and rollback.
+- [CI/CD notes](docs/ci-cd.md) — required checks, pinned actions, integration-test database, branch protection owner action.
+- [Security audit triage](docs/security-audit.md) — production gate and accepted development-only findings.
+- [Decision records](docs/decision-records.md) — rationale for validation, serverless lifecycle, proxy migration, and seed safety.
 
 ## Visual Evidence
 Add real captured screenshots to `docs/screenshots/` and update links here:

@@ -25,7 +25,7 @@ Because every remaining finding is confined to development/test tooling, the
 meaningful gate is a production-only audit at `high` severity:
 
 ```bash
-npm run audit:prod   # npm audit --omit=dev --audit-level=high
+npm run audit:prod   # npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org
 ```
 
 After the Zod upgrade this reports **0 vulnerabilities**. CI runs this gate as
@@ -39,6 +39,8 @@ findings and stop distinguishing real production risk from lint-runner noise.
 - Before fix: 19 total (2 critical, 16 high, 1 moderate) — all pre-existing on `main`.
 - After fix: 18 total (2 critical, 15 high, 1 moderate), all development-only.
 - Production-only audit: 0 total.
-- Regression coverage: API and web typecheck, lint, existing unit tests and both
-  builds pass with Zod 4.6.7; validation-schema assertions are in
-  `apps/api/tests/validation.test.ts` and the new route tests.
+- Regression coverage: API and web typecheck, lint, unit tests and both builds
+  pass with Zod 4.6.7; validation-schema assertions are in
+  `apps/api/tests/unit/validation.test.ts`, real-route validation coverage is in
+  `apps/api/tests/unit/routes.test.ts`, and Zod 4 React Hook Form compatibility
+  is covered by `apps/web/tests/form-resolver.test.ts`.
