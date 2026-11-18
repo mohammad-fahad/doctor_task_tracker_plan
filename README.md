@@ -176,7 +176,7 @@ flowchart LR
   end
 ```
 
-The web app resolves the API base URL at build time (`NEXT_PUBLIC_API_BASE_URL`) and fails fast in production when it is missing or invalid. The serverless API validates its runtime environment at cold start and waits for one shared MongoDB connection before serving non-liveness requests; failed initialization is retried on the next invocation.
+The web app inlines `NEXT_PUBLIC_API_BASE_URL` at build time and validates it when an API request is made, so a missing/invalid production value raises a clear `ApiConfigurationError` without blocking Vercel preview builds. The serverless API validates its runtime environment at cold start and waits for one shared MongoDB connection before serving non-liveness requests; failed initialization is retried on the next invocation.
 
 **Data flow:** UI actions -> validated client forms -> API client (`fetch` with cookies) -> Express middleware/validation -> service layer -> Mongoose/MongoDB -> normalized JSON responses -> TanStack Query cache/invalidation.
 
@@ -285,14 +285,14 @@ npm run audit:prod
 npm run test:unit
 npm run test:integration
 npm run build:api
-NEXT_PUBLIC_API_BASE_URL=https://api.example.com/api/v1 npm run build:web
+npm run build:web
 ```
 
 `npm run test:unit` runs API unit tests plus web tests (no database required). Coverage includes validation schemas, query builders, dashboard aggregation mapping, real Express routes with mocked services, seed safety, serverless lifecycle/retry/concurrency, API config resolution, and proxy redirects.
 
 `npm run test:integration` runs DB-backed API tests only when `MONGODB_URI_TEST` points to a reachable isolated MongoDB. Without it, the suite skips cleanly. CI provides a `mongo:7` service and sets `MONGODB_URI_TEST`, so integration coverage runs on every PR. The tests drop only their dedicated test database in `afterAll`; never point this variable at production.
 
-> `next build` intentionally fails when `NEXT_PUBLIC_API_BASE_URL` is missing in production mode. Set it to the real API URL on Vercel and to any syntactically valid placeholder for local/CI build verification.
+> `next build` deliberately does not require `NEXT_PUBLIC_API_BASE_URL`; the first API call in production throws a clear configuration error if it is missing or invalid. Set it to the real API URL on Vercel for a usable deployment.
 
 ## Deployment Readiness (Vercel + MongoDB Atlas)
 
@@ -317,7 +317,7 @@ NEXT_PUBLIC_API_BASE_URL=https://api.example.com/api/v1 npm run build:web
 - `DEMO_SEED_DATABASE` — optional exact database guard for local/preview demo seeding only
 
 **Web (Vercel project `web`, Production + Preview)**
-- `NEXT_PUBLIC_API_BASE_URL=https://<api-domain>/api/v1` — required; a missing/invalid value fails the build
+- `NEXT_PUBLIC_API_BASE_URL=https://<api-domain>/api/v1` — required for a usable production deployment; missing/invalid values throw a clear runtime error
 - `COOKIE_NAME=dt_token` — server-side proxy only, must match API
 
 > `NEXT_PUBLIC_*` values are inlined at build time. Changing them requires a redeploy. Preview deployments must point at the preview API and include that preview web origin in the API's `CORS_ORIGINS`.

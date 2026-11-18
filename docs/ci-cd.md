@@ -15,7 +15,7 @@ Single `verify` job on `ubuntu-latest` with `contents: read` permissions and can
 7. `npm run test:unit`
 8. `npm run test:integration`
 9. `npm run build:api`
-10. `npm run build:web` with a placeholder `NEXT_PUBLIC_API_BASE_URL`
+10. `npm run build:web` (no API URL is required for the build)
 
 Actions are pinned to commit SHAs with version comments so an upstream tag move cannot change workflow code without a reviewed diff. `.github/dependabot.yml` checks npm and GitHub Actions weekly and groups dev tooling updates.
 

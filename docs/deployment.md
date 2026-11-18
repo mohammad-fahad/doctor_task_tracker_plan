@@ -37,7 +37,7 @@ Set these on both Production and Preview, with environment-specific values:
 
 ### Web
 
-- `NEXT_PUBLIC_API_BASE_URL=https://<api-domain>/api/v1` (required in production; invalid values fail the build)
+- `NEXT_PUBLIC_API_BASE_URL=https://<api-domain>/api/v1` (required for a usable production deployment; missing/invalid values throw a clear runtime error)
 - `COOKIE_NAME=dt_token` (server-side proxy; must match API)
 
 `NEXT_PUBLIC_*` variables are compiled into the client bundle. Changing the API URL requires a redeploy.

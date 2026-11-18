@@ -36,7 +36,7 @@
 
 **Decision:** `resolveApiBaseUrl()` rejects missing/malformed/non-HTTP(S) values in production, rejects production localhost URLs, normalizes trailing slashes, and allows localhost fallback only in development/test. `joinApiUrl()` composes paths without duplicate separators.
 
-**Why:** A client pointed at the wrong API domain fails silently at runtime; failing the build makes misconfiguration visible before deployment.
+**Why:** A client pointed at the wrong API domain should fail loudly. Validation is deferred to the first API call so Vercel preview builds and CI are not blocked by environment values that are only meaningful at runtime; the thrown `ApiConfigurationError` names the exact variable.
 
 **Alternatives rejected:** hard-coded URLs, silent fallback in production, and runtime-only validation.
 

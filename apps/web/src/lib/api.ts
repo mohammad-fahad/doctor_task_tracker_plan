@@ -1,6 +1,12 @@
-import { joinApiUrl, resolveApiBaseUrl } from "./api-config";
+import { assertApiBaseUrl, joinApiUrl, resolveApiBaseUrl } from "./api-config";
 
-const API_BASE = resolveApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL, process.env.NODE_ENV);
+const CONFIGURED_BASE = resolveApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL, process.env.NODE_ENV);
+let validatedBase: string | undefined;
+
+function apiBaseUrl() {
+  validatedBase ??= assertApiBaseUrl(CONFIGURED_BASE, process.env.NODE_ENV);
+  return validatedBase;
+}
 
 export class ApiClientError extends Error {
   status: number;
@@ -16,7 +22,7 @@ type ApiOptions = RequestInit & { json?: unknown };
 
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const { json, headers, ...rest } = options;
-  const res = await fetch(joinApiUrl(API_BASE, path), {
+  const res = await fetch(joinApiUrl(apiBaseUrl(), path), {
     credentials: "include",
     headers: {
       ...(json ? { "Content-Type": "application/json" } : {}),
