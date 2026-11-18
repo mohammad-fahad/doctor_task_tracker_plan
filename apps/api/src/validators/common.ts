@@ -18,3 +18,5 @@ export const dateRangeQuerySchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
 });
+
+export type DateRangeQuery = z.infer<typeof dateRangeQuerySchema>;

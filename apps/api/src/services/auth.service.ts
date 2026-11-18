@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import jwt, { type SignOptions } from "jsonwebtoken";
 import { env } from "../config/env.js";
 import { User } from "../models/User.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -12,7 +12,7 @@ export async function authenticateAdmin(email: string, password: string) {
   const token = jwt.sign(
     { sub: String(user._id), role: user.role },
     env.JWT_SECRET,
-    { expiresIn: env.JWT_EXPIRES_IN as any }
+    { expiresIn: env.JWT_EXPIRES_IN as NonNullable<SignOptions["expiresIn"]> }
   );
   return { token, user: { id: String(user._id), email: user.email, role: user.role } };
 }

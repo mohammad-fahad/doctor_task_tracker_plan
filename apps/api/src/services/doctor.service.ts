@@ -1,32 +1,29 @@
-import mongoose from "mongoose";
-import { Doctor } from "../models/Doctor.js";
+import mongoose, { type Types } from "mongoose";
+import { Doctor, type IDoctor } from "../models/Doctor.js";
 import { Patient } from "../models/Patient.js";
 import { ApiError } from "../utils/ApiError.js";
 import { normalizeText } from "../utils/normalize.js";
 import { buildPagination, parsePagination } from "../utils/pagination.js";
 import { buildDoctorFilter } from "../utils/queryBuilders.js";
+import type { CreateDoctorInput, ListDoctorsQuery } from "../validators/doctor.js";
 
-export type DoctorListQuery = {
-  page?: string; limit?: string; search?: string; specialization?: string; hospital?: string; sort?: "newest"|"oldest"; from?: string; to?: string;
-};
+type DoctorWithId = IDoctor & { _id: Types.ObjectId };
 
-export async function createDoctor(input: { name: string; specialization: string; hospital: string; phone: string; email: string }) {
+export async function createDoctor(input: CreateDoctorInput) {
   const doc = await Doctor.create({
     ...input,
     nameNormalized: normalizeText(input.name),
     specializationNormalized: normalizeText(input.specialization),
     hospitalNormalized: normalizeText(input.hospital),
   });
-  const obj = doc.toObject() as any;
-  obj.id = String(obj._id);
-  return obj;
+  return { ...doc.toObject(), id: String(doc._id) };
 }
 
-export async function listDoctors(query: DoctorListQuery) {
+export async function listDoctors(query: ListDoctorsQuery) {
   const { page, limit, skip } = parsePagination(query);
   const filter = buildDoctorFilter(query);
 
-  const sort = query.sort === "oldest" ? { createdAt: 1 as const, _id: 1 as const } : { createdAt: -1 as const, _id: -1 as const };
+  const sort = query.sort === "oldest" ? ({ createdAt: 1, _id: 1 } as const) : ({ createdAt: -1, _id: -1 } as const);
 
   const [data, total] = await Promise.all([
     Doctor.find(filter).sort(sort).skip(skip).limit(limit).lean(),
@@ -34,14 +31,14 @@ export async function listDoctors(query: DoctorListQuery) {
   ]);
 
   return {
-    data: data.map((d: any) => ({ ...d, id: String(d._id) })),
+    data: (data as DoctorWithId[]).map((d) => ({ ...d, id: String(d._id) })),
     pagination: buildPagination(page, limit, total),
   };
 }
 
 export async function getDoctorById(id: string) {
   if (!mongoose.isValidObjectId(id)) throw new ApiError(400, "Invalid doctor id");
-  const doctor: any = await Doctor.findById(id).lean();
+  const doctor = (await Doctor.findById(id).lean()) as DoctorWithId | null;
   if (!doctor) throw new ApiError(404, "Doctor not found");
   const patientCount = await Patient.countDocuments({ doctorId: doctor._id });
   return { ...doctor, id: String(doctor._id), patientCount };
@@ -52,8 +49,9 @@ export async function getDoctorFilterOptions() {
     Doctor.distinct("specialization"),
     Doctor.distinct("hospital"),
   ]);
+  const asStrings = (values: unknown[]) => values.filter((v): v is string => typeof v === "string");
   return {
-    specializations: specializations.sort((a, b) => a.localeCompare(b)),
-    hospitals: hospitals.sort((a, b) => a.localeCompare(b)),
+    specializations: asStrings(specializations).sort((a, b) => a.localeCompare(b)),
+    hospitals: asStrings(hospitals).sort((a, b) => a.localeCompare(b)),
   };
 }

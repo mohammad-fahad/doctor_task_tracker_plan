@@ -13,3 +13,6 @@ export const listDoctorsQuerySchema = paginationQuerySchema.extend({
   specialization: z.string().optional(),
   hospital: z.string().optional(),
 });
+
+export type CreateDoctorInput = z.infer<typeof createDoctorSchema>;
+export type ListDoctorsQuery = z.infer<typeof listDoctorsQuerySchema>;

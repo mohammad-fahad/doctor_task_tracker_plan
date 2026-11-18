@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
+import mongoose from "mongoose";
 import { connectDb, disconnectDb } from "../config/db.js";
-import { assertRuntimeEnv } from "../config/env.js";
+import { assertRuntimeEnv, env } from "../config/env.js";
 import { Doctor } from "../models/Doctor.js";
 import { Patient } from "../models/Patient.js";
 import { ensureAdminSeed } from "../services/auth.service.js";
@@ -28,7 +30,16 @@ const conditions = [
   "GERD","Coronary Artery Disease","Depression","COPD","Irritable Bowel Syndrome"
 ] as const;
 
-function pick<T>(arr: readonly T[], i: number): T { return arr[i % arr.length]!; }
+const PATIENT_COUNT = 84;
+
+export type SeedOptions = {
+  reset?: boolean;
+  expectedDatabase?: string | undefined;
+};
+
+function pick<T>(arr: readonly T[], i: number): T {
+  return arr[i % arr.length]!;
+}
 
 function daysAgo(n: number) {
   const d = new Date();
@@ -37,64 +48,128 @@ function daysAgo(n: number) {
   return d;
 }
 
-async function main() {
+function deterministicId(kind: "doctor" | "patient", index: number) {
+  const digest = createHash("sha1").update(`doctor-tracker:demo:${kind}:${index}`).digest();
+  return new mongoose.Types.ObjectId(digest.subarray(0, 12));
+}
+
+export function assertSeedSafety(options: SeedOptions = {}) {
+  if (env.isProduction) {
+    throw new Error("Demo seeding is disabled in production");
+  }
+  if (options.reset && !options.expectedDatabase) {
+    throw new Error("Destructive demo reset requires expectedDatabase confirmation");
+  }
+  if (options.expectedDatabase && !/^[A-Za-z0-9_-]+$/.test(options.expectedDatabase)) {
+    throw new Error("Expected demo database name contains invalid characters");
+  }
+  if (options.expectedDatabase && /prod/i.test(options.expectedDatabase)) {
+    throw new Error("Refusing to seed a database whose name looks like production");
+  }
+}
+
+export function assertTargetDatabase(expected?: string) {
+  const actual = mongoose.connection.db?.databaseName;
+  if (!actual) throw new Error("Demo seeding requires an active database connection");
+  if (expected && actual !== expected) {
+    throw new Error(`Refusing to seed unexpected database '${actual}' (expected '${expected}')`);
+  }
+  if (/prod/i.test(actual)) {
+    throw new Error(`Refusing to seed database '${actual}' because its name looks like production`);
+  }
+}
+
+export async function runDemoSeed(options: SeedOptions = {}) {
+  assertSeedSafety(options);
   assertRuntimeEnv();
   await connectDb();
-  await ensureAdminSeed().catch(() => {});
+  assertTargetDatabase(options.expectedDatabase ?? process.env.DEMO_SEED_DATABASE);
 
-  // Idempotent demo state for this assignment dataset.
-  await Patient.deleteMany({});
-  await Doctor.deleteMany({});
+  const admin = await ensureAdminSeed();
+  if (!admin) throw new Error("Admin seeding did not complete");
 
-  const doctorDocs = await Doctor.insertMany(
-    doctorsSeed.map((d) => ({
-      ...d,
-      nameNormalized: normalizeText(d.name),
-      specializationNormalized: normalizeText(d.specialization),
-      hospitalNormalized: normalizeText(d.hospital),
+  const doctorIds = doctorsSeed.map((_, i) => deterministicId("doctor", i));
+  const patientIds = Array.from({ length: PATIENT_COUNT }, (_, i) => deterministicId("patient", i));
+
+  if (options.reset) {
+    if (!options.expectedDatabase) throw new Error("Destructive demo reset requires expectedDatabase confirmation");
+    await Patient.deleteMany({ _id: { $in: patientIds } });
+    await Doctor.deleteMany({ _id: { $in: doctorIds } });
+  }
+
+  await Doctor.bulkWrite(
+    doctorsSeed.map((d, i) => ({
+      updateOne: {
+        filter: { _id: doctorIds[i] },
+        update: {
+          $set: {
+            ...d,
+            nameNormalized: normalizeText(d.name),
+            specializationNormalized: normalizeText(d.specialization),
+            hospitalNormalized: normalizeText(d.hospital),
+          },
+        },
+        upsert: true,
+      },
     }))
   );
 
-  const patients = [];
-  const total = 84;
-  for (let i = 0; i < total; i++) {
+  const patients = Array.from({ length: PATIENT_COUNT }, (_, i) => {
     const first = pick(firstNames, i * 3 + 1);
     const last = pick(lastNames, i * 5 + 2);
     const name = `${first} ${last}`;
-    const doctor = pick(doctorDocs, i);
+    const doctor = doctorIds[i % doctorIds.length]!;
     const gender = pick(genders, i);
     const condition = pick(conditions, i * 2);
     const age = 18 + ((i * 7) % 65);
     const phone = `555-1${String(200 + i).padStart(3, "0")}`;
     const email = i % 5 === 0 ? undefined : `${first.toLowerCase()}.${last.toLowerCase()}${i}@example.com`;
     const createdAt = daysAgo(i % 120);
-    patients.push({
+    return {
+      _id: patientIds[i],
       name,
-      doctorId: doctor._id,
+      doctorId: doctor,
       age,
       gender,
       condition,
       phone,
-      ...(email ? { email } : {}),
+      ...(email ? { email, emailNormalized: normalizeText(email) } : { email: undefined, emailNormalized: undefined }),
       nameNormalized: normalizeText(name),
       conditionNormalized: normalizeText(condition),
       phoneNormalized: normalizeText(phone),
-      ...(email ? { emailNormalized: normalizeText(email) } : {}),
       createdAt,
       updatedAt: createdAt,
-    });
-  }
+    };
+  });
 
-  await Patient.insertMany(patients);
+  await Patient.bulkWrite(
+    patients.map((p) => ({
+      updateOne: {
+        filter: { _id: p._id },
+        update: { $set: p },
+        upsert: true,
+      },
+    }))
+  );
 
-  console.log(`Seeded ${doctorDocs.length} doctors and ${patients.length} patients.`);
+  return { doctors: doctorIds.length, patients: patientIds.length };
 }
 
-main()
-  .catch((err) => {
-    console.error(err instanceof Error ? err.message : err);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await disconnectDb().catch(() => {});
-  });
+async function main() {
+  const reset = process.argv.includes("--reset");
+  const expectedDatabase = process.argv.find((a) => a.startsWith("--database="))?.slice("--database=".length);
+  const result = await runDemoSeed({ reset, expectedDatabase });
+  console.log(`Seeded ${result.doctors} demo doctors and ${result.patients} demo patients.`);
+}
+
+const invokedPath = process.argv[1] ?? "";
+if (invokedPath.endsWith("seed-demo.ts") || invokedPath.endsWith("seed-demo.js")) {
+  main()
+    .catch((err: unknown) => {
+      console.error(err instanceof Error ? err.message : err);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await disconnectDb().catch(() => {});
+    });
+}

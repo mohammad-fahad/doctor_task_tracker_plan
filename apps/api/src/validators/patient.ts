@@ -22,3 +22,7 @@ export const listPatientsQuerySchema = paginationQuerySchema.extend({
   doctorId: z.string().optional(),
   condition: z.string().optional(),
 });
+
+export type CreatePatientInput = z.infer<typeof createPatientSchema>;
+export type UpdatePatientInput = z.infer<typeof updatePatientSchema>;
+export type ListPatientsQuery = z.infer<typeof listPatientsQuerySchema>;
