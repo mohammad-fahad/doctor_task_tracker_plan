@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 
 // Lightweight service logic test via module shape expectations.
 // Full aggregation correctness is verified against MongoDB in integration environments.

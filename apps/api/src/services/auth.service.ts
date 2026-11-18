@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import jwt, { type SignOptions } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 import { User } from "../models/User.js";
 import { ApiError } from "../utils/ApiError.js";

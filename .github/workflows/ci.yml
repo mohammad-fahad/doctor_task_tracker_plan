@@ -1,13 +1,17 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
-    branches: [main]
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -24,19 +28,19 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci
 
-      - name: TypeScript typecheck
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
         run: npm run typecheck
 
-      - name: ESLint (web)
-        run: npx --no-install eslint apps/web --config apps/web/eslint.config.mjs --max-warnings=0
-
-      - name: Unit tests
+      - name: Test
         run: npm run test
 
       - name: Build API
         run: npm run build:api
 
-      - name: Build frontend
+      - name: Build web
         run: npm run build:web

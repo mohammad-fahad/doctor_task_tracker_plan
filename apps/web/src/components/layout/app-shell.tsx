@@ -22,13 +22,8 @@ const nav = [
   { href: "/patients", label: "Patients", icon: Users },
 ];
 
-export function AppShell({ title, children, actions }: { title: string; children: React.ReactNode; actions?: React.ReactNode }) {
-  const pathname = usePathname();
-  const [open, setOpen] = useState(false);
-  const { data: me } = useMe();
-  const logout = useLogout();
-
-  const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
+function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+  return (
     <nav className="space-y-1">
       {nav.map((item) => {
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -50,6 +45,13 @@ export function AppShell({ title, children, actions }: { title: string; children
       })}
     </nav>
   );
+}
+
+export function AppShell({ title, children, actions }: { title: string; children: React.ReactNode; actions?: React.ReactNode }) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const { data: me } = useMe();
+  const logout = useLogout();
 
   return (
     <div className="min-h-screen bg-background">
@@ -59,7 +61,7 @@ export function AppShell({ title, children, actions }: { title: string; children
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Doctor Tracker</div>
             <div className="mt-1 text-sm text-muted-foreground">Clinical Administration</div>
           </div>
-          <NavLinks />
+          <NavLinks pathname={pathname} />
           <div className="mt-auto rounded-lg border bg-white p-3 text-xs text-muted-foreground">
             Manage doctors, patients, and operational insights in one workspace.
           </div>
@@ -107,7 +109,7 @@ export function AppShell({ title, children, actions }: { title: string; children
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close navigation"><X className="h-5 w-5" /></Button>
                 </div>
-                <NavLinks onNavigate={() => setOpen(false)} />
+                <NavLinks pathname={pathname} onNavigate={() => setOpen(false)} />
               </div>
             </div>
           )}

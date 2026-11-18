@@ -6,7 +6,7 @@ import { useParams, usePathname, useRouter, useSearchParams } from "next/navigat
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
@@ -69,6 +69,7 @@ function DoctorDetailContent() {
     resolver: zodResolver(patientSchema),
     defaultValues: { name: "", age: 0, gender: "male", condition: "", phone: "", email: "" },
   });
+  const gender = useWatch({ control: form.control, name: "gender" });
 
   const addPatient = useMutation({
     mutationFn: (values: PatientFormValues) => doctorApi.addPatient(id, { ...values, email: values.email || undefined }),
@@ -130,7 +131,7 @@ function DoctorDetailContent() {
                 </div>
                 <div className="space-y-2">
                   <Label>Gender</Label>
-                  <Select value={form.watch("gender")} onValueChange={(v) => form.setValue("gender", v as any, { shouldValidate: true })}>
+                  <Select value={gender} onValueChange={(v) => form.setValue("gender", v as any, { shouldValidate: true })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="male">Male</SelectItem>

@@ -1,4 +1,4 @@
-import mongoose, { Schema, model, type Model, type HydratedDocument, type Types } from "mongoose";
+import mongoose, { Schema, model, type Model, type HydratedDocument } from "mongoose";
 
 export interface IUser {
   email: string;

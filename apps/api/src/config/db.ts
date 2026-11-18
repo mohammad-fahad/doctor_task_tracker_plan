@@ -17,11 +17,7 @@ export async function connectDb(uri = env.MONGODB_URI): Promise<typeof mongoose>
     throw new Error(`Database connection failed: ${message}`);
   });
 
-  try {
-    return await connectPromise;
-  } catch (err) {
-    throw err;
-  }
+  return connectPromise;
 }
 
 export async function disconnectDb(): Promise<void> {
