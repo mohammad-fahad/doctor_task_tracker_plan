@@ -14,7 +14,7 @@ export async function requireAuth(req: AuthRequest, _res: Response, next: NextFu
 
   try {
     const payload = jwt.verify(token, env.JWT_SECRET) as { sub: string };
-    const user = await User.findById(payload.sub).select("email role").lean();
+    const user = await User.findById(payload.sub).select("email role").lean() as any;
     if (!user) return next(new ApiError(401, "Authentication required"));
     req.user = { id: String(user._id), email: user.email, role: user.role };
     next();

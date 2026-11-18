@@ -18,17 +18,17 @@ const doctorsSeed = [
   { name: "Dr. James Walker", specialization: "Psychiatry", hospital: "Westbrook Health Campus", phone: "555-0110", email: "james.walker@example.com" },
   { name: "Dr. Mia Johnson", specialization: "Cardiology", hospital: "Lakeside General Hospital", phone: "555-0111", email: "mia.johnson@example.com" },
   { name: "Dr. Lucas Martin", specialization: "Pediatrics", hospital: "Harborview Medical Center", phone: "555-0112", email: "lucas.martin@example.com" },
-];
+] as const;
 
-const firstNames = ["Emma","Liam","Olivia","Noah","Ava","Elijah","Sophia","James","Isabella","William","Mia","Benjamin","Charlotte","Lucas","Amelia","Henry","Harper","Alexander","Evelyn","Michael","Abigail","Daniel","Emily","Matthew"];
-const lastNames = ["Smith","Johnson","Williams","Brown","Jones","Garcia","Miller","Davis","Rodriguez","Martinez","Hernandez","Lopez","Gonzalez","Wilson","Anderson","Thomas","Taylor","Moore","Jackson","Martin"];
+const firstNames = ["Emma","Liam","Olivia","Noah","Ava","Elijah","Sophia","James","Isabella","William","Mia","Benjamin","Charlotte","Lucas","Amelia","Henry","Harper","Alexander","Evelyn","Michael","Abigail","Daniel","Emily","Matthew"] as const;
+const lastNames = ["Smith","Johnson","Williams","Brown","Jones","Garcia","Miller","Davis","Rodriguez","Martinez","Hernandez","Lopez","Gonzalez","Wilson","Anderson","Thomas","Taylor","Moore","Jackson","Martin"] as const;
 const genders = ["male", "female", "other"] as const;
 const conditions = [
   "Hypertension","Type 2 Diabetes","Asthma","Migraine","Arthritis","Eczema","Anxiety","Back Pain","Allergic Rhinitis","Hypothyroidism",
   "GERD","Coronary Artery Disease","Depression","COPD","Irritable Bowel Syndrome"
-];
+] as const;
 
-function pick<T>(arr: readonly T[], i: number) { return arr[i % arr.length]; }
+function pick<T>(arr: readonly T[], i: number): T { return arr[i % arr.length]!; }
 
 function daysAgo(n: number) {
   const d = new Date();
@@ -55,13 +55,13 @@ async function main() {
     }))
   );
 
-  const patients: any[] = [];
+  const patients = [];
   const total = 84;
   for (let i = 0; i < total; i++) {
     const first = pick(firstNames, i * 3 + 1);
     const last = pick(lastNames, i * 5 + 2);
     const name = `${first} ${last}`;
-    const doctor = doctorDocs[i % doctorDocs.length];
+    const doctor = pick(doctorDocs, i);
     const gender = pick(genders, i);
     const condition = pick(conditions, i * 2);
     const age = 18 + ((i * 7) % 65);
@@ -75,11 +75,11 @@ async function main() {
       gender,
       condition,
       phone,
-      email,
+      ...(email ? { email } : {}),
       nameNormalized: normalizeText(name),
       conditionNormalized: normalizeText(condition),
       phoneNormalized: normalizeText(phone),
-      emailNormalized: email ? normalizeText(email) : undefined,
+      ...(email ? { emailNormalized: normalizeText(email) } : {}),
       createdAt,
       updatedAt: createdAt,
     });

@@ -1,6 +1,21 @@
-import mongoose, { Schema, type InferSchemaType } from "mongoose";
+import mongoose, { Schema, model, type Model, type HydratedDocument } from "mongoose";
 
-const doctorSchema = new Schema(
+export interface IDoctor {
+  name: string;
+  specialization: string;
+  hospital: string;
+  phone: string;
+  email: string;
+  nameNormalized: string;
+  specializationNormalized: string;
+  hospitalNormalized: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type DoctorDocument = HydratedDocument<IDoctor>;
+
+const doctorSchema = new Schema<IDoctor>(
   {
     name: { type: String, required: true, trim: true },
     specialization: { type: String, required: true, trim: true },
@@ -17,5 +32,5 @@ const doctorSchema = new Schema(
 doctorSchema.index({ createdAt: -1 });
 doctorSchema.index({ specializationNormalized: 1, hospitalNormalized: 1, createdAt: -1 });
 
-export type DoctorDocument = InferSchemaType<typeof doctorSchema> & { _id: mongoose.Types.ObjectId };
-export const Doctor = mongoose.models.Doctor || mongoose.model("Doctor", doctorSchema);
+export const Doctor: Model<IDoctor> = (mongoose.models.Doctor as Model<IDoctor>) || model<IDoctor>("Doctor", doctorSchema);
+

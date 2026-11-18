@@ -45,13 +45,23 @@ export async function assertDoctorExists(doctorId: string) {
 
 export async function createPatient(input: PatientInput) {
   await assertDoctorExists(input.doctorId);
-  const doc = await Patient.create({
-    ...input,
+  const payload: Record<string, unknown> = {
+    name: input.name,
     doctorId: new mongoose.Types.ObjectId(input.doctorId),
-    email: input.email || undefined,
-    ...toNormalized(input),
-  });
-  const populated: any = await Patient.findById(doc._id).populate("doctorId", "name specialization hospital").lean();
+    age: input.age,
+    gender: input.gender,
+    condition: input.condition,
+    phone: input.phone,
+    nameNormalized: normalizeText(input.name),
+    conditionNormalized: normalizeText(input.condition),
+    phoneNormalized: normalizeText(input.phone),
+  };
+  if (input.email) {
+    payload.email = input.email;
+    payload.emailNormalized = normalizeText(input.email);
+  }
+  const doc = await Patient.create(payload as any);
+  const populated = await Patient.findById((doc as any)._id).populate("doctorId", "name specialization hospital").lean();
   return mapPatient(populated);
 }
 

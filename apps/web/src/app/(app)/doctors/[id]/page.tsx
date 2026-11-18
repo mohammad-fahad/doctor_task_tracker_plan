@@ -32,6 +32,7 @@ const patientSchema = z.object({
   phone: z.string().trim().min(7, "Enter a valid phone number"),
   email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")),
 });
+
 type PatientFormValues = z.infer<typeof patientSchema>;
 
 function DoctorDetailContent() {
@@ -54,7 +55,10 @@ function DoctorDetailContent() {
 
   function updateParams(updates: Record<string, string | number | undefined>) {
     const sp = new URLSearchParams(searchParams.toString());
-    Object.entries(updates).forEach(([k, v]) => { if (v === undefined || v === "") sp.delete(k); else sp.set(k, String(v)); });
+    Object.entries(updates).forEach(([k, v]) => {
+      if (v === undefined || v === "") sp.delete(k);
+      else sp.set(k, String(v));
+    });
     router.replace(`${pathname}?${sp.toString()}`);
   }
 
@@ -153,4 +157,101 @@ function DoctorDetailContent() {
                 </div>
                 <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
                   <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-    
+                  <Button type="submit" disabled={addPatient.isPending}>{addPatient.isPending ? "Saving..." : "Add patient"}</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      }
+    >
+      <div className="space-y-6">
+        {doctorQuery.isLoading ? (
+          <Skeleton className="h-36 w-full" />
+        ) : doctorQuery.isError ? (
+          <ErrorState message={(doctorQuery.error as Error)?.message} onRetry={() => doctorQuery.refetch()} />
+        ) : doctor && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{doctor.name}</CardTitle>
+              <CardDescription>{doctor.specialization} · {doctor.hospital}</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div><div className="text-muted-foreground">Email</div><div className="font-medium">{doctor.email}</div></div>
+              <div><div className="text-muted-foreground">Phone</div><div className="font-medium">{doctor.phone}</div></div>
+              <div><div className="text-muted-foreground">Patients</div><div className="font-medium">{doctor.patientCount ?? "-"}</div></div>
+              <div><div className="text-muted-foreground">Created</div><div className="font-medium">{formatDate(doctor.createdAt)}</div></div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card className="overflow-hidden">
+          <CardHeader>
+            <CardTitle>Patients</CardTitle>
+            <CardDescription>Patients assigned to this doctor.</CardDescription>
+          </CardHeader>
+          {patientsQuery.isLoading ? (
+            <div className="space-y-3 p-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+          ) : patientsQuery.isError ? (
+            <div className="p-4"><ErrorState message={(patientsQuery.error as Error)?.message} onRetry={() => patientsQuery.refetch()} /></div>
+          ) : patients.length === 0 ? (
+            <div className="p-4 pt-0"><EmptyState title="No patients yet" description="Add a patient to this doctor to get started." action={<Button onClick={() => setOpen(true)}>Add patient</Button>} /></div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Condition</TableHead>
+                    <TableHead className="hidden md:table-cell">Age/Gender</TableHead>
+                    <TableHead className="hidden lg:table-cell">Contact</TableHead>
+                    <TableHead className="hidden md:table-cell">Registered</TableHead>
+                    <TableHead className="w-[80px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {patients.map((p: any) => (
+                    <TableRow key={p.id || p._id}>
+                      <TableCell className="font-medium">{p.name}</TableCell>
+                      <TableCell>{p.condition}</TableCell>
+                      <TableCell className="hidden md:table-cell">{p.age} · {p.gender}</TableCell>
+                      <TableCell className="hidden text-sm text-muted-foreground lg:table-cell"><div>{p.phone}</div><div>{p.email || "-"}</div></TableCell>
+                      <TableCell className="hidden md:table-cell">{formatDate(p.createdAt)}</TableCell>
+                      <TableCell>
+                        <ConfirmDialog
+                          trigger={<Button variant="ghost" size="icon" aria-label={`Delete ${p.name}`}><Trash2 className="h-4 w-4 text-red-600" /></Button>}
+                          title="Delete patient?"
+                          description={`This will permanently remove ${p.name} from records.`}
+                          onConfirm={() => deletePatient.mutate(p.id || p._id)}
+                          disabled={deletePatient.isPending}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {pagination && (
+                <PaginationControls
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  total={pagination.total}
+                  limit={pagination.limit}
+                  onPageChange={(page) => updateParams({ page })}
+                  onLimitChange={(limit) => updateParams({ limit, page: 1 })}
+                />
+              )}
+            </>
+          )}
+        </Card>
+      </div>
+    </AppShell>
+  );
+}
+
+export default function DoctorDetailPage() {
+  return (
+    <Suspense fallback={<AppShell title="Doctor details"><Skeleton className="h-40 w-full" /></AppShell>}>
+      <DoctorDetailContent />
+    </Suspense>
+  );
+}

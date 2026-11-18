@@ -14,17 +14,17 @@ export const listDoctors = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getDoctor = asyncHandler(async (req: Request, res: Response) => {
-  const doctor = await doctorService.getDoctorById(req.params.id);
+  const doctor = await doctorService.getDoctorById(req.params.id as string);
   res.json({ success: true, data: doctor });
 });
 
 export const getDoctorPatients = asyncHandler(async (req: Request, res: Response) => {
-  const result = await patientService.listPatients(req.query as any, req.params.id);
+  const result = await patientService.listPatients(req.query as any, req.params.id as string);
   res.json({ success: true, ...result });
 });
 
 export const addDoctorPatient = asyncHandler(async (req: Request, res: Response) => {
-  const patient = await patientService.createPatient({ ...req.body, doctorId: req.params.id });
+  const patient = await patientService.createPatient({ ...req.body, doctorId: req.params.id as string });
   res.status(201).json({ success: true, data: patient });
 });
 

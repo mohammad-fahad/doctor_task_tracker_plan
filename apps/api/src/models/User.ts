@@ -1,6 +1,16 @@
-import mongoose, { Schema, type InferSchemaType } from "mongoose";
+import mongoose, { Schema, model, type Model, type HydratedDocument, type Types } from "mongoose";
 
-const userSchema = new Schema(
+export interface IUser {
+  email: string;
+  passwordHash: string;
+  role: "admin";
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type UserDocument = HydratedDocument<IUser>;
+
+const userSchema = new Schema<IUser>(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
@@ -9,5 +19,5 @@ const userSchema = new Schema(
   { timestamps: true }
 );
 
-export type UserDocument = InferSchemaType<typeof userSchema> & { _id: mongoose.Types.ObjectId };
-export const User = mongoose.models.User || mongoose.model("User", userSchema);
+export const User: Model<IUser> = (mongoose.models.User as Model<IUser>) || model<IUser>("User", userSchema);
+

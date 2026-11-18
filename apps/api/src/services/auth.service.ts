@@ -1,17 +1,19 @@
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import jwt, { type SignOptions } from "jsonwebtoken";
 import { env } from "../config/env.js";
 import { User } from "../models/User.js";
 import { ApiError } from "../utils/ApiError.js";
 
 export async function authenticateAdmin(email: string, password: string) {
-  const user = await User.findOne({ email: email.toLowerCase() });
+  const user = await User.findOne({ email: email.toLowerCase() }).exec();
   if (!user) throw new ApiError(401, "Invalid email or password");
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) throw new ApiError(401, "Invalid email or password");
-  const token = jwt.sign({ sub: String(user._id), role: user.role }, env.JWT_SECRET, {
-    expiresIn: env.JWT_EXPIRES_IN,
-  });
+  const token = jwt.sign(
+    { sub: String(user._id), role: user.role },
+    env.JWT_SECRET,
+    { expiresIn: env.JWT_EXPIRES_IN as any }
+  );
   return { token, user: { id: String(user._id), email: user.email, role: user.role } };
 }
 
@@ -21,9 +23,9 @@ export async function ensureAdminSeed(email?: string, password?: string) {
   if (!adminEmail || !adminPassword) {
     throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD must be provided for admin seeding");
   }
-  const existing = await User.findOne({ email: adminEmail });
+  const existing = await User.findOne({ email: adminEmail }).exec();
   if (existing) return { created: false, email: adminEmail };
   const passwordHash = await bcrypt.hash(adminPassword, 12);
-  await User.create({ email: adminEmail, passwordHash, role: "admin" });
+  await User.create({ email: adminEmail, passwordHash, role: "admin" as const });
   return { created: true, email: adminEmail };
 }

@@ -13,16 +13,16 @@ export const createPatient = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const getPatient = asyncHandler(async (req: Request, res: Response) => {
-  const patient = await patientService.getPatientById(req.params.id);
+  const patient = await patientService.getPatientById(req.params.id as string);
   res.json({ success: true, data: patient });
 });
 
 export const updatePatient = asyncHandler(async (req: Request, res: Response) => {
-  const patient = await patientService.updatePatient(req.params.id, req.body);
+  const patient = await patientService.updatePatient(req.params.id as string, req.body);
   res.json({ success: true, data: patient });
 });
 
 export const deletePatient = asyncHandler(async (req: Request, res: Response) => {
-  await patientService.deletePatient(req.params.id);
+  await patientService.deletePatient(req.params.id as string);
   res.json({ success: true, message: "Patient deleted" });
 });

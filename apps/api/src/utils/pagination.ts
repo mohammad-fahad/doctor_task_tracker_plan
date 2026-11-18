@@ -3,9 +3,8 @@ export function parsePagination(query: { page?: unknown; limit?: unknown }) {
   const limitRaw = typeof query.limit === "string" ? Number(query.limit) : 10;
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
   const limitCandidate = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.floor(limitRaw) : 10;
-  const limit = Math.min(limitCandidate, 50);
   const allowed = [10, 20, 50];
-  const normalizedLimit = allowed.includes(limit) ? limit : 10;
+  const normalizedLimit = allowed.includes(limitCandidate) ? limitCandidate : 10;
   return { page, limit: normalizedLimit, skip: (page - 1) * normalizedLimit };
 }
 

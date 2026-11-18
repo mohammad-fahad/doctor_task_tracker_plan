@@ -6,5 +6,5 @@ export function normalizeText(value: string): string {
 }
 
 export function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\]/g, "\$&");
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

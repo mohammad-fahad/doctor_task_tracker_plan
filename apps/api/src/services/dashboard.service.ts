@@ -4,14 +4,14 @@ import { parseDateRange } from "../utils/dateRange.js";
 
 export async function getDashboardSummary(from?: string, to?: string) {
   const range = parseDateRange(from, to);
-  const createdAtMatch = range ? { createdAt: range } : undefined;
+  const periodFilter = (range ? { createdAt: range } : {}) as Record<string, unknown>;
 
   const [totalDoctors, totalPatients, newPatientsInPeriod, patientsPerDoctor, registrationsOverTime] = await Promise.all([
     Doctor.countDocuments({}),
     Patient.countDocuments({}),
-    Patient.countDocuments(createdAtMatch ? { createdAt: range } : {}),
+    Patient.countDocuments(periodFilter as any),
     Patient.aggregate([
-      ...(createdAtMatch ? [{ $match: { createdAt: range } }] : []),
+      ...(range ? [{ $match: { createdAt: range } as any }] : []),
       { $group: { _id: "$doctorId", patientCount: { $sum: 1 } } },
       { $sort: { patientCount: -1, _id: 1 } },
       { $limit: 10 },
@@ -27,7 +27,7 @@ export async function getDashboardSummary(from?: string, to?: string) {
       },
     ]),
     Patient.aggregate([
-      ...(createdAtMatch ? [{ $match: { createdAt: range } }] : []),
+      ...(range ? [{ $match: { createdAt: range } as any }] : []),
       {
         $group: {
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
@@ -39,18 +39,15 @@ export async function getDashboardSummary(from?: string, to?: string) {
     ]),
   ]);
 
-  // include doctors with zero patients in chart context when no range filter? better to include top/active only to keep chart meaningful.
-  // We'll also return all-time per-doctor counts separately not necessary; requirement states "Patients per doctor" chart.
-  // For a complete view with zero-patient doctors when unfiltered small dataset, augment lightly with doctor list if needed.
   let perDoctor = patientsPerDoctor as Array<{ doctorId: string; doctorName: string; patientCount: number }>;
-  if (!createdAtMatch) {
+  if (!range) {
     const allDoctors = await Doctor.find({}, { name: 1 }).sort({ name: 1 }).lean();
     const countMap = new Map(perDoctor.map((d) => [d.doctorId, d.patientCount]));
-    perDoctor = allDoctors.map((d) => ({
+    perDoctor = allDoctors.map((d: any) => ({
       doctorId: String(d._id),
       doctorName: d.name,
       patientCount: countMap.get(String(d._id)) || 0,
-    })).sort((a,b) => b.patientCount - a.patientCount || a.doctorName.localeCompare(b.doctorName)).slice(0, 12);
+    })).sort((a, b) => b.patientCount - a.patientCount || a.doctorName.localeCompare(b.doctorName)).slice(0, 12);
   }
 
   return {
