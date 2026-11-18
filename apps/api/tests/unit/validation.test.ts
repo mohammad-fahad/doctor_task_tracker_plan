@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { loginSchema } from "../src/validators/auth.js";
-import { createDoctorSchema } from "../src/validators/doctor.js";
-import { createPatientSchema, updatePatientSchema } from "../src/validators/patient.js";
+import { loginSchema } from "../../src/validators/auth.js";
+import { createDoctorSchema } from "../../src/validators/doctor.js";
+import { createPatientSchema, updatePatientSchema } from "../../src/validators/patient.js";
 
 describe("auth validation", () => {
   it("accepts valid login payload", () => {

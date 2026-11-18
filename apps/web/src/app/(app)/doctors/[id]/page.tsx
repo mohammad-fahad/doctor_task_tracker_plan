@@ -27,13 +27,13 @@ import { formatDate } from "@/lib/utils";
 const patientSchema = z.object({
   name: z.string().trim().min(2, "Name is required"),
   age: z.coerce.number().int().min(0).max(130),
-  gender: z.enum(["male", "female", "other"], { required_error: "Gender is required" }),
+  gender: z.enum(["male", "female", "other"], { error: "Gender is required" }),
   condition: z.string().trim().min(2, "Condition is required"),
   phone: z.string().trim().min(7, "Enter a valid phone number"),
   email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")),
 });
 
-type PatientFormValues = z.infer<typeof patientSchema>;
+type PatientFormValues = z.input<typeof patientSchema>;
 
 function DoctorDetailContent() {
   const params = useParams<{ id: string }>();
@@ -72,7 +72,10 @@ function DoctorDetailContent() {
   const gender = useWatch({ control: form.control, name: "gender" });
 
   const addPatient = useMutation({
-    mutationFn: (values: PatientFormValues) => doctorApi.addPatient(id, { ...values, email: values.email || undefined }),
+    mutationFn: (values: PatientFormValues) => {
+      const parsed = patientSchema.parse(values);
+      return doctorApi.addPatient(id, { ...parsed, email: parsed.email || undefined });
+    },
     onSuccess: async () => {
       toast.success("Patient added");
       setOpen(false);

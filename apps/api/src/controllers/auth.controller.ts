@@ -3,6 +3,8 @@ import { env } from "../config/env.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { authenticateAdmin } from "../services/auth.service.js";
 import type { AuthRequest } from "../middleware/auth.js";
+import { validated } from "../middleware/validate.js";
+import type { LoginInput } from "../validators/auth.js";
 
 const cookieOptions = () => ({
   httpOnly: true,
@@ -13,8 +15,8 @@ const cookieOptions = () => ({
   maxAge: 7 * 24 * 60 * 60 * 1000,
 });
 
-export const login = asyncHandler(async (req: Request, res: Response) => {
-  const { email, password } = req.body as { email: string; password: string };
+export const login = asyncHandler(async (_req: Request, res: Response) => {
+  const { email, password } = validated<LoginInput>(res, "body");
   const { token, user } = await authenticateAdmin(email, password);
   res.cookie(env.COOKIE_NAME, token, cookieOptions());
   res.json({ success: true, data: { user } });

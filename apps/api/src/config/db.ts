@@ -3,6 +3,20 @@ import { env } from "./env.js";
 
 let connectPromise: Promise<typeof mongoose> | null = null;
 
+export function connectionState() {
+  return mongoose.connection.readyState;
+}
+
+export async function isDbHealthy() {
+  if (mongoose.connection.readyState !== 1 || !mongoose.connection.db) return false;
+  try {
+    await mongoose.connection.db.admin().ping();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function connectDb(uri = env.MONGODB_URI): Promise<typeof mongoose> {
   if (!uri) {
     throw new Error("Database connection failed: MONGODB_URI is not configured");
@@ -11,7 +25,7 @@ export async function connectDb(uri = env.MONGODB_URI): Promise<typeof mongoose>
   if (connectPromise) return connectPromise;
 
   mongoose.set("strictQuery", true);
-  connectPromise = mongoose.connect(uri).catch((err) => {
+  connectPromise = mongoose.connect(uri).catch((err: unknown) => {
     connectPromise = null;
     const message = err instanceof Error ? err.message : "Unknown database connection error";
     throw new Error(`Database connection failed: ${message}`);

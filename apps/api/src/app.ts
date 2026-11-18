@@ -6,6 +6,7 @@ import { env } from "./config/env.js";
 import routes from "./routes/index.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 import { verifyOrigin } from "./middleware/auth.js";
+import { initializeValidated } from "./middleware/validate.js";
 
 export function createApp() {
   const app = express();
@@ -24,6 +25,7 @@ export function createApp() {
   app.use(express.json({ limit: "100kb" }));
   app.use(cookieParser());
   app.use(verifyOrigin);
+  app.use(initializeValidated);
 
   app.use("/api/v1", routes);
 

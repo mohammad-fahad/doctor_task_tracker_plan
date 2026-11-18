@@ -29,13 +29,13 @@ const patientSchema = z.object({
   name: z.string().trim().min(2, "Name is required"),
   doctorId: z.string().min(1, "Doctor is required"),
   age: z.coerce.number().int().min(0, "Age must be valid").max(130, "Age must be valid"),
-  gender: z.enum(["male", "female", "other"], { required_error: "Gender is required" }),
+  gender: z.enum(["male", "female", "other"], { error: "Gender is required" }),
   condition: z.string().trim().min(2, "Condition is required"),
   phone: z.string().trim().min(7, "Enter a valid phone number"),
   email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")),
 });
 
-type PatientFormValues = z.infer<typeof patientSchema>;
+type PatientFormValues = z.input<typeof patientSchema>;
 
 function PatientFormFields({ form, doctors }: { form: any; doctors: any[] }) {
   const errors = form.formState.errors;
@@ -171,7 +171,8 @@ function PatientsContent() {
 
   const saveMutation = useMutation({
     mutationFn: (values: PatientFormValues) => {
-      const payload = { ...values, email: values.email || undefined };
+      const parsed = patientSchema.parse(values);
+      const payload = { ...parsed, email: parsed.email || undefined };
       const id = editing ? ((editing as any).id || (editing as any)._id) : "";
       return editing ? patientApi.update(id, payload) : patientApi.create(payload);
     },
