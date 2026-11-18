@@ -33,7 +33,7 @@ const patientSchema = z.object({
   email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")),
 });
 
-type PatientFormValues = z.infer<typeof patientSchema>;
+type PatientFormValues = z.input<typeof patientSchema>;
 
 function DoctorDetailContent() {
   const params = useParams<{ id: string }>();
@@ -72,7 +72,10 @@ function DoctorDetailContent() {
   const gender = useWatch({ control: form.control, name: "gender" });
 
   const addPatient = useMutation({
-    mutationFn: (values: PatientFormValues) => doctorApi.addPatient(id, { ...values, email: values.email || undefined }),
+    mutationFn: (values: PatientFormValues) => {
+      const parsed = patientSchema.parse(values);
+      return doctorApi.addPatient(id, { ...parsed, email: parsed.email || undefined });
+    },
     onSuccess: async () => {
       toast.success("Patient added");
       setOpen(false);

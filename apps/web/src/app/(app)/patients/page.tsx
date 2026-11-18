@@ -35,7 +35,7 @@ const patientSchema = z.object({
   email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")),
 });
 
-type PatientFormValues = z.infer<typeof patientSchema>;
+type PatientFormValues = z.input<typeof patientSchema>;
 
 function PatientFormFields({ form, doctors }: { form: any; doctors: any[] }) {
   const errors = form.formState.errors;
@@ -171,7 +171,8 @@ function PatientsContent() {
 
   const saveMutation = useMutation({
     mutationFn: (values: PatientFormValues) => {
-      const payload = { ...values, email: values.email || undefined };
+      const parsed = patientSchema.parse(values);
+      const payload = { ...parsed, email: parsed.email || undefined };
       const id = editing ? ((editing as any).id || (editing as any)._id) : "";
       return editing ? patientApi.update(id, payload) : patientApi.create(payload);
     },
